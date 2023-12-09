@@ -52,7 +52,9 @@ int32_t npRound(float x)
     }
     return lround(x + 0.5F);
 }
+//VoxelGeneratorPlugin有三个构造函数：
 
+// 构造函数1：接受体素生成器的配置参数，用来初始化插件的各种属性，如体素的数量、每个体素中点的数量以及体素的空间范围和大小等。
 VoxelGeneratorPlugin::VoxelGeneratorPlugin(int32_t maxVoxels, int32_t maxPoints, int32_t voxelFeatures, float xMin,
     float xMax, float yMin, float yMax, float zMin, float zMax, float pillarX, float pillarY, float pillarZ)
     : mPillarNum(maxVoxels)
@@ -70,6 +72,7 @@ VoxelGeneratorPlugin::VoxelGeneratorPlugin(int32_t maxVoxels, int32_t maxPoints,
 {
 }
 
+// 构造函数2：是构造函数1的扩展，增加了对点云特征数量和网格尺寸的处理。
 VoxelGeneratorPlugin::VoxelGeneratorPlugin(int32_t maxVoxels, int32_t maxPoints, int32_t voxelFeatures, float xMin,
     float xMax, float yMin, float yMax, float zMin, float zMax, float pillarX, float pillarY, float pillarZ,
     int32_t pointFeatures, int32_t gridX, int32_t gridY, int32_t gridZ)
@@ -91,7 +94,7 @@ VoxelGeneratorPlugin::VoxelGeneratorPlugin(int32_t maxVoxels, int32_t maxPoints,
     , mGridZSize(gridZ)
 {
 }
-
+// 构造函数3：接受序列化数据和长度，用于反序列化创建插件实例。
 VoxelGeneratorPlugin::VoxelGeneratorPlugin(void const* data, size_t length)
 {
     PLUGIN_ASSERT(data != nullptr);
@@ -115,7 +118,7 @@ VoxelGeneratorPlugin::VoxelGeneratorPlugin(void const* data, size_t length)
     mGridZSize = readFromBuffer<int32_t>(d);
     PLUGIN_ASSERT(d == a + length);
 }
-
+//clone函数用于创建当前插件实例的副本。
 nvinfer1::IPluginV2DynamicExt* VoxelGeneratorPlugin::clone() const noexcept
 {
     try
@@ -132,7 +135,7 @@ nvinfer1::IPluginV2DynamicExt* VoxelGeneratorPlugin::clone() const noexcept
     }
     return nullptr;
 }
-
+//getOutputDimensions函数用于计算和返回输出tensor的维度。
 nvinfer1::DimsExprs VoxelGeneratorPlugin::getOutputDimensions(int32_t outputIndex, nvinfer1::DimsExprs const* inputs,
     int32_t nbInputs, nvinfer1::IExprBuilder& exprBuilder) noexcept
 {
@@ -171,6 +174,7 @@ nvinfer1::DimsExprs VoxelGeneratorPlugin::getOutputDimensions(int32_t outputInde
     return nvinfer1::DimsExprs{};
 }
 
+//supportsFormatCombination函数用于确定插件是否支持特定的输入/输出格式组合。
 bool VoxelGeneratorPlugin::supportsFormatCombination(
     int32_t pos, nvinfer1::PluginTensorDesc const* inOut, int32_t nbInputs, int32_t nbOutputs) noexcept
 {
@@ -208,7 +212,7 @@ bool VoxelGeneratorPlugin::supportsFormatCombination(
     }
     return false;
 }
-
+//configurePlugin函数在推理开始前设置插件的配置。
 void VoxelGeneratorPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc const* in, int32_t nbInputs,
     nvinfer1::DynamicPluginTensorDesc const* out, int32_t nbOutputs) noexcept
 {
@@ -229,7 +233,7 @@ void VoxelGeneratorPlugin::configurePlugin(nvinfer1::DynamicPluginTensorDesc con
         caughtError(e);
     }
 }
-
+//getWorkspaceSize函数返回执行这个插件所需的额外工作空间大小。
 size_t VoxelGeneratorPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* inputs, int32_t nbInputs,
     nvinfer1::PluginTensorDesc const* outputs, int32_t nbOutputs) const noexcept
 {
@@ -254,6 +258,21 @@ size_t VoxelGeneratorPlugin::getWorkspaceSize(nvinfer1::PluginTensorDesc const* 
     }
     return 0U;
 }
+// enqueue函数实现了插件的核心功能，即点云数据到体素数据的转换。它将数据从输入buffers转移到输出buffers，并使用CUDA在GPU上执行这些计算。
+
+// enqueue函数是TensorRT插件必须实现的一个核心函数，它负责在网络执行推理时调用插件的前向运算。在VoxelGeneratorPlugin的上下文中，enqueue函数会执行将输入点云数据转换为体素表示的计算。
+
+// 以下是enqueue函数的具体步骤：
+
+// 执行核心计算：
+
+// 函数的具体步骤是根据VoxelGeneratorPlugin的实现逻辑和TensorRT框架的要求来编写的。尽管这个函数在CUDA流（stream）中异步执行，但它会负责多个并行计算步骤，这些步骤结合起来完成点云到体素的转换。
+
+// enqueue函数中的每个CUDA调用（如generateVoxels_launch、generateBaseFeatures_launch和generateFeatures_launch）都会涉及到CUDA核心（kernel）的执行，这些核心是并行在GPU上执行的。具体的CUDA核心实现细节（如算法逻辑、内存访问模式等）在这段代码中并未给出，它们通常在单独的.cu文件中定义。
+
+// 最后，如果在执行过程中发生异常，enqueue函数将捕获异常并返回一个非零的状态码，这通常表示执行失败。
+
+// 概括来说，enqueue函数的职责是：设置执行环境（如工作空间）、在GPU上执行计算核心，并确保所有操作都正确地在指定的CUDA流上异步执行。
 
 int32_t VoxelGeneratorPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDesc,
     nvinfer1::PluginTensorDesc const* outputDesc, void const* const* inputs, void* const* outputs, void* workspace,
@@ -261,15 +280,20 @@ int32_t VoxelGeneratorPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDes
 {
     try
     {
+        // 提取批次大小和点数：从inputDesc描述符中提取批次大小（batchSize）和每批次最大点数（maxNumPoints）。
         int32_t batchSize = inputDesc[0].dims.d[0];
         int32_t maxNumPoints = inputDesc[0].dims.d[1];
         // TRT-input
+        // 准备输入输出指针：
+        // 通过inputs数组获取输入点云数据（pointCloud）和每个点云中点的数量（pointNumPtr）。
         float* pointCloud = const_cast<float*>((float const*) inputs[0]);
         uint32_t* pointNumPtr = const_cast<uint32_t*>((uint32_t const*) inputs[1]);
         // TRT-output
+        // 通过outputs数组获取输出数据的内存位置，包括体素特征（pillarFeaturesData）、体素坐标（coordsData）和体素参数（paramsData）。
         float* pillarFeaturesData = static_cast<float*>(outputs[0]);
         uint32_t* coordsData = static_cast<uint32_t*>(outputs[1]);
         uint32_t* paramsData = static_cast<uint32_t*>(outputs[2]);
+        // 计算工作空间大小：工作空间是执行插件所需的临时内存空间。计算所需的工作空间大小，并为每个部分分配内存。
         int32_t densePillarNum = mGridZSize * mGridYSize * mGridXSize;
         size_t maskSize = batchSize * densePillarNum * sizeof(uint32_t);
         size_t voxelsSize = batchSize * densePillarNum * mPointNum * mPointFeatureNum * sizeof(float);
@@ -288,6 +312,7 @@ int32_t VoxelGeneratorPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDes
         uint32_t* voxelNumPoints = reinterpret_cast<uint32_t*>(
             nextWorkspacePtr(reinterpret_cast<int8_t*>(voxelFeatures), voxelFeaturesSize));
         // Initialize workspace memory
+        // 初始化工作空间：使用cudaMemsetAsync清零工作空间，确保没有未初始化的数据。
         PLUGIN_CUASSERT(cudaMemsetAsync(mask, 0, totalWorkspace, stream));
         uint32_t pillarFeaturesDataSize = batchSize * mPillarNum * mPointNum * mFeatureNum * sizeof(float);
         uint32_t coordsDataSize = batchSize * mPillarNum * 4 * sizeof(uint32_t);
@@ -296,11 +321,13 @@ int32_t VoxelGeneratorPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDes
         PLUGIN_CUASSERT(cudaMemsetAsync(coordsData, 0, coordsDataSize, stream));
         PLUGIN_CUASSERT(cudaMemsetAsync(paramsData, 0, paramsDataSize, stream));
         // pointcloud + pointNum ---> mask_ + voxel_
+        // 调用generateVoxels_launch函数，根据输入点云生成一个中间的体素表示，它会填充mask和voxels缓冲区。
         generateVoxels_launch(batchSize, maxNumPoints, pointCloud, pointNumPtr, mMinXRange, mMaxXRange, mMinYRange,
             mMaxYRange, mMinZRange, mMaxZRange, mPillarXSize, mPillarYSize, mPillarZSize, mGridYSize, mGridXSize,
             mPointFeatureNum, mPointNum, mask, voxels, stream);
         // mask_ + voxel_ ---> params_data + voxel_features_ + voxel_num_points_ +
         // coords_data
+        //// 调用generateFeatures_launch函数，根据基础特征生成最终的体素特征数据，这是送入网络进行后续处理的数据。
         generateBaseFeatures_launch(batchSize, mask, voxels, mGridYSize, mGridXSize, paramsData, mPillarNum, mPointNum,
             mPointFeatureNum, voxelFeatures, voxelNumPoints, coordsData, stream);
         generateFeatures_launch(batchSize, densePillarNum, voxelFeatures, voxelNumPoints, coordsData, paramsData,
@@ -314,7 +341,17 @@ int32_t VoxelGeneratorPlugin::enqueue(nvinfer1::PluginTensorDesc const* inputDes
     }
     return -1;
 }
+//VoxelGeneratorPluginCreator是用于创建VoxelGeneratorPlugin实例的工厂类。这个类实现了IPluginCreator接口。
 
+// getPluginName和getPluginVersion函数返回插件创建者支持的插件名称和版本。
+
+// getFieldNames函数返回一个包含字段的集合，这些字段可用于通过属性来构造插件。
+
+// createPlugin函数根据传入的字段集合创建一个插件实例。
+
+// deserializePlugin函数从序列化数据创建一个插件实例。
+
+// 最后，setPluginNamespace和getPluginNamespace函数用于设置和获取插件创建者的命名空间。
 nvinfer1::DataType VoxelGeneratorPlugin::getOutputDataType(
     int32_t index, nvinfer1::DataType const* inputTypes, int32_t nbInputs) const noexcept
 {
